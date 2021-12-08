@@ -42,6 +42,7 @@ using Reason = xyz::openbmc_project::Certs::InvalidCertificate::REASON;
 
 constexpr auto ACF_FILE_PATH = "/etc/acf/service.acf";
 constexpr auto PROD_PUB_KEY_FILE_PATH = "/srv/ibm-acf/ibmacf-prod.key";
+constexpr auto PROD_BACKUP_PUB_KEY_FILE_PATH = "/srv/ibm-acf/ibmacf-prod-backup.key";
 constexpr auto DEV_PUB_KEY_FILE_PATH = "/srv/ibm-acf/ibmacf-dev.key";
 constexpr auto DBUS_INVENTORY_SYSTEM_OBJECT =
     "/xyz/openbmc_project/inventory/system";
@@ -345,9 +346,11 @@ acf_info ACFCertMgr::installACF(std::vector<uint8_t> accessControlFile)
 
     bool prodKeyExists = false;
     bool devKeyExists = false;
+    bool prodBackupKeyExists = false;
     try
     {
         prodKeyExists = std::filesystem::exists(PROD_PUB_KEY_FILE_PATH);
+        prodBackupKeyExists = std::filesystem::exists(PROD_BACKUP_PUB_KEY_FILE_PATH);
         devKeyExists = std::filesystem::exists(DEV_PUB_KEY_FILE_PATH);
     }
     catch (const std::filesystem::filesystem_error& e)
@@ -357,7 +360,7 @@ acf_info ACFCertMgr::installACF(std::vector<uint8_t> accessControlFile)
     }
 
     // This should never occur
-    if (!((prodKeyExists || devKeyExists)))
+    if (!((prodKeyExists || devKeyExists || prodBackupKeyExists)))
     {
         log<level::ERR>("Neither prod or dev key exist. This shouldn't happen");
         elog<InternalFailure>();
@@ -379,9 +382,23 @@ acf_info ACFCertMgr::installACF(std::vector<uint8_t> accessControlFile)
             elog<InternalFailure>();
         }
     }
+    if (prodBackupKeyExists && sRc != CeLogin::CeLoginRc::Success)
+    {
+        std::vector<uint8_t> sPublicKeyFile;
+        if (readBinaryFile(PROD_BACKUP_PUB_KEY_FILE_PATH, sPublicKeyFile))
+        {
+            sRc = verifyAcfSerialNumberAndExpiration(accessControlFile,
+                                                     sPublicKeyFile, sDate);
+        }
+        else
+        {
+            log<level::ERR>("cannot read production key file");
+            elog<InternalFailure>();
+        }
+    }
     // If ACF check against production key failed, check against the development
     // key.
-    else if (!prodKeyExists || sRc != CeLogin::CeLoginRc::Success)
+    if (devKeyExists && sRc != CeLogin::CeLoginRc::Success)
     {
         // Only want to check signature against development signed public key if
         // FieldModeProperty is not enabled
@@ -442,7 +459,7 @@ std::tuple<std::vector<uint8_t>, bool, std::string> ACFCertMgr::getACFInfo(void)
     bool isAcfInstalled = false;
     bool prodKeyExists = false;
     bool devKeyExists = false;
-
+    bool prodBackupKeyExists = false;
     std::string sDate;
     CeLogin::CeLoginRc sRc = CeLogin::CeLoginRc::Failure;
     std::vector<uint8_t> accessControlFile;
@@ -451,6 +468,7 @@ std::tuple<std::vector<uint8_t>, bool, std::string> ACFCertMgr::getACFInfo(void)
     {
         isAcfInstalled = std::filesystem::exists(ACF_FILE_PATH);
         prodKeyExists = std::filesystem::exists(PROD_PUB_KEY_FILE_PATH);
+        prodBackupKeyExists = std::filesystem::exists(PROD_BACKUP_PUB_KEY_FILE_PATH);
         devKeyExists = std::filesystem::exists(DEV_PUB_KEY_FILE_PATH);
     }
     catch (const std::filesystem::filesystem_error& e)
@@ -460,7 +478,7 @@ std::tuple<std::vector<uint8_t>, bool, std::string> ACFCertMgr::getACFInfo(void)
     }
 
     // ACF and production or development key should exist otherwise exit
-    if (!((prodKeyExists || devKeyExists) && isAcfInstalled))
+    if (!((prodKeyExists || devKeyExists || prodBackupKeyExists ) && isAcfInstalled))
     {
         // Returns empty data as file is not installed
         return std::make_tuple(accessControlFile, isAcfInstalled, sDate);
@@ -488,7 +506,22 @@ std::tuple<std::vector<uint8_t>, bool, std::string> ACFCertMgr::getACFInfo(void)
         }
     }
 
-    if (sRc != CeLogin::CeLoginRc::Success)
+    if (prodBackupKeyExists && sRc != CeLogin::CeLoginRc::Success)
+    {
+        std::vector<uint8_t> sPublicKeyFile;
+        if (readBinaryFile(PROD_BACKUP_PUB_KEY_FILE_PATH, sPublicKeyFile))
+        {
+            sRc = verifyAcfSerialNumberAndExpiration(accessControlFile,
+                                                     sPublicKeyFile, sDate);
+        }
+        else
+        {
+            log<level::ERR>("cannot read production key file");
+            elog<InternalFailure>();
+        }
+    }
+
+    if (devKeyExists && sRc != CeLogin::CeLoginRc::Success)
     {
         // Only want to check signature against development signed public key if
         // FieldModeProperty is not enabled
