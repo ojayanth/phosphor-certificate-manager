@@ -50,6 +50,7 @@ constexpr auto DBUS_INVENTORY_ASSET_INTERFACE =
     "xyz.openbmc_project.Inventory.Decorator.Asset";
 constexpr auto DBUS_SERIAL_NUM_PROP = "SerialNumber";
 constexpr auto UNSET_SERIAL_NUM_KEYWORD = "UNSET";
+constexpr auto BLANK_SERIAL_NUMBER = "       ";
 constexpr auto DBUS_SOFTWARE_OBJECT = "/xyz/openbmc_project/software";
 constexpr auto DBUS_FIELDMODE_INTERFACE =
     "xyz.openbmc_project.Control.FieldMode";
@@ -229,7 +230,7 @@ static CeLogin::CeLoginRc
             DBUS_SERIAL_NUM_PROP);
 
         // If serial number is empty on machine set as UNSET for check with acf
-        if (mSerialNumber.empty())
+        if (mSerialNumber.empty() || (mSerialNumber == BLANK_SERIAL_NUMBER))
         {
             mSerialNumber = UNSET_SERIAL_NUM_KEYWORD;
         }
