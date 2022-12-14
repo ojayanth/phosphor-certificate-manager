@@ -1,6 +1,10 @@
 cxx = meson.get_compiler('cpp')
 celogin_dep =  cxx.find_library('celogin')
-jsmn_dep = dependency('jsmn')
+if cxx.has_header('jsmn.h')
+    jsmn_dep = declare_dependency()
+else
+    jsmn_dep = dependency('jsmn')
+endif
 openssl_dep = dependency('openssl')
 
 bmc_acf_deps = [
