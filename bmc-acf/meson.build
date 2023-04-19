@@ -6,6 +6,7 @@ else
     jsmn_dep = dependency('jsmn')
 endif
 openssl_dep = dependency('openssl')
+tacf_dep = dependency('tacf', required : true)
 
 bmc_acf_deps = [
     celogin_dep,
@@ -15,6 +16,7 @@ bmc_acf_deps = [
     phosphor_logging_dep,
     sdbusplus_dep,
     sdeventplus_dep,
+    tacf_dep,
 ]
 
 bmc_acf_lib = static_library(
